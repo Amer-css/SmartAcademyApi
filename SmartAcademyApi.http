@@ -1,0 +1,6 @@
+@SmartAcademyApi_HostAddress = http://localhost:5226
+
+GET {{SmartAcademyApi_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

@@ -1,0 +1,9 @@
+# .NET Core / Visual Studio
+/[Bb]in/
+/[Oo]bj/
+.vs/
+*.user
+*.suo
+
+# Sensitive App Settings appsettings.json
+appsettings.*.json
