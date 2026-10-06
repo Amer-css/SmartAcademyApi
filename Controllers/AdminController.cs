@@ -55,7 +55,7 @@ namespace SmartAcademyApi.Controllers
 
 
 
-        [HttpGet("users")]
+        [HttpGet("GatAllUsers")]
         public async Task<IActionResult> GetAllUsers()
         {
             var users = await _context.Users

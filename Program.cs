@@ -7,6 +7,9 @@ using System.Text;
 using Microsoft.OpenApi.Models;
 using Microsoft.AspNetCore.RateLimiting;
 using System.Threading.RateLimiting;
+using Microsoft.AspNetCore.Authorization;
+using SmartAcademyApi.Authorization;
+using SmartAcademyApi.AuditMiddlewar;
 
 
 
@@ -21,6 +24,7 @@ builder.Services.AddAuthentication(Options =>
 {
     Options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
     Options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+   
 })
 .AddJwtBearer(options =>
 {
@@ -75,13 +79,21 @@ builder.Services.AddRateLimiter(options =>
 
 });
 
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy("StudentOwnerOrAdmin", policy =>
+        policy.Requirements.Add(new StudentOwnerOrAdminRequirement()));
+});
 
+//Register the policy handler that contains the ownership logic.
+builder.Services.AddSingleton<IAuthorizationHandler,StudentOwnerOrAdminHandler>();
 
 // Add services to the container.
 
 builder.Services.AddControllers();
 
 builder.Services.AddEndpointsApiExplorer();
+
 
 
 // Register Swagger generator and customize its behavior.
@@ -149,7 +161,7 @@ builder.Services.AddSwaggerGen(options =>
 });
 
 
-
+builder.Services.AddScoped<IAuditService, AuditService>();
 
 
 var app = builder.Build();
@@ -165,7 +177,7 @@ app.UseHttpsRedirection();
 app.UseRateLimiter(); // before auth
 app.UseAuthentication(); 
 app.UseAuthorization();
-
+app.UseMiddleware<AuditMiddleware>();
 app.MapControllers();
 
 app.Run();

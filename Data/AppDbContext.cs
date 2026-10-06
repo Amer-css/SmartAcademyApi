@@ -17,6 +17,7 @@ namespace SmartAcademyApi.Data
         public DbSet<Exam> Exams { get; set; }
         public DbSet<Question> Questions { get; set; }
 
+        public DbSet<AuditLog> AuditLogs { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

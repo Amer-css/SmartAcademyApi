@@ -158,6 +158,48 @@ namespace SmartAcademyApi.Controllers
 
         }
 
+        [HttpGet("{id}", Name = "GetStudentById")]
+        public async Task<ActionResult> GetStudentById(int id, [FromServices] IAuthorizationService authorizationService)
+
+        {
+            if (id < 1)
+                return BadRequest("Invalid student id.");
+
+            var student = await _context.Users
+               .Where(u => u.Id == id && u.Role == "Student")
+               .Include(u => u.Enrollments)
+               .ThenInclude(e => e.Course)
+               .Select(u => new
+               {
+                   u.Id,
+                   u.FullName,
+                   u.Email,
+                   EnrolledCourses = u.Enrollments.Select(e => new
+                   {
+                       e.Course.Id,
+                       e.Course.Title,
+                       e.Course.Price,
+                       e.EnrolledAt
+                   })
+               })
+               .FirstOrDefaultAsync();
+
+            if (student == null)
+                return NotFound("Student not found.");
+
+            // Dynamically evaluate the policy while passing the ID (resource)
+            var authResult = await authorizationService.AuthorizeAsync(
+                User,
+                id,
+                "StudentOwnerOrAdmin");
+
+            if (!authResult.Succeeded)
+                return NotFound("Student not found."); // Returns 403 Forbidden if not the owner or an admin.
+
+            return Ok(student);
+        }
+
+
 
     }
 }
