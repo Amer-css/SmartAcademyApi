@@ -57,7 +57,8 @@ namespace SmartAcademyApi.Controllers
             var enrollment = new Enrollment
             {
                 StudentId = studentId,
-                CourseId = courseId
+                CourseId = courseId,
+                IsActive = true
             };
 
             _context.Enrollments.Add(enrollment);
@@ -139,5 +140,27 @@ namespace SmartAcademyApi.Controllers
             return Ok(new { message = "Successfully enrolled in the course." });
         }
 
+        [HttpPost("uneroll")]
+        [Authorize(Roles = "Admin")]
+        [EnableRateLimiting("WriteLimiter")]
+        public async Task<IActionResult> UnenrollStudentByCourse(int studentId, int courseId)
+        {
+            // Find the active enrollment matching both student and course
+            var enrollment = await _context.Enrollments
+            .FirstOrDefaultAsync(e => e.StudentId == studentId && e.CourseId == courseId && e.IsActive == true);
+
+            if (enrollment == null)
+            {
+                return NotFound(new { message = "No active enrollment found for this student in the specified course." });
+            }
+
+            // Deactivate the enrollment
+            enrollment.IsActive = false;
+
+            _context.Enrollments.Update(enrollment);
+            await _context.SaveChangesAsync();
+
+            return Ok(new { message = "Enrollment has been deactivated successfully." });
+        }
     }
 }

@@ -14,9 +14,9 @@ namespace SmartAcademyApi.Models
         // معرف الكورس المسجل فيه
         public int CourseId { get; set; }
         public Course Course { get; set; }
-
+        public bool? IsActive { get; set; }
         public DateTime EnrolledAt { get; set; } = DateTime.UtcNow;
-        public bool IsActive { get; set; } = true;
+        
 
 
     }

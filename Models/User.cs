@@ -23,14 +23,16 @@ namespace SmartAcademyApi.Models
         [Required]
         public string Role { get; set; } // Admin, Instructor, Student
 
-        // علاقة One-to-Many: المدرس الواحد يمكن أن يمتلك عدة كورسات
+
+        // One-to-Many relationship: A single teacher can have multiple courses.
         public ICollection<Course> Courses { get; set; }
 
         public ICollection<Enrollment> Enrollments { get; set; }
 
+        public bool? IsActive { get; set; } 
 
 
-        public string RefreshTokenHash { get; set; }
+        public string? RefreshTokenHash { get; set; }
         public DateTime? RefreshTokenExpiresAt { get; set; }
         public DateTime? RefreshTokenRevokedAt { get; set; }
     }

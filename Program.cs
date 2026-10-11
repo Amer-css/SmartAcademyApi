@@ -10,7 +10,8 @@ using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authorization;
 using SmartAcademyApi.Authorization;
 using SmartAcademyApi.AuditMiddlewar;
-
+using Swashbuckle.AspNetCore.SwaggerGen;
+using SmartAcademy.API.Filters;
 
 
 var builder = WebApplication.CreateBuilder(args);
@@ -132,9 +133,13 @@ builder.Services.AddSwaggerGen(options =>
         Description = "Enter: Bearer {your JWT token}"
     });
 
-
     // ===============================
-    // 2) Require the Bearer scheme for secured endpoints
+    // 2) Automatic 401 & 403 Response Filter
+    // ===============================
+    //Enable automatic addition for 401 and 403
+    options.OperationFilter<AuthorizeCheckOperationFilter>();
+    // ===============================
+    // 3) Require the Bearer scheme for secured endpoints
     // ===============================
     //
     // This tells Swagger that endpoints protected by [Authorize]
@@ -181,3 +186,5 @@ app.UseMiddleware<AuditMiddleware>();
 app.MapControllers();
 
 app.Run();
+
+

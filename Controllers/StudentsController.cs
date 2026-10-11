@@ -199,7 +199,7 @@ namespace SmartAcademyApi.Controllers
             return Ok(student);
         }
 
-
+       
 
     }
 }

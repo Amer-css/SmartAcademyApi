@@ -59,19 +59,52 @@ namespace SmartAcademyApi.Controllers
         public async Task<IActionResult> GetAllUsers()
         {
             var users = await _context.Users
-                .Select(u => new
-                {
-                    u.Id,
-                    u.FullName,
-                    u.Email,
-                    u.Role
-                })
+            .Where(u => u.IsActive == true) // Fetch only active users (ignoring soft-deleted ones)
+            .Select(u => new                
+            {
+              u.Id,
+              u.FullName,
+              u.Email,
+              u.Role,
+              u.IsActive
+            })
                 .ToListAsync();
 
             return Ok(users);
         }
 
+        [HttpDelete("Delete/{id}")]
+        [EnableRateLimiting("WriteLimiter")]
+        public async Task<IActionResult> DeleteStudent(int id)
+        {
+            // Find the student user by ID
+            var student = await _context.Users.FindAsync(id);
+            if (student == null)
+            {
+                return NotFound(new { message = "Student not found." });
+            }
 
+            // Optional: Check if the student has active enrollments before deactivation
+            bool hasActiveEnrollments = await _context.Enrollments
+                .AnyAsync(e => e.StudentId == id && e.IsActive == true);
+
+            // If you want to prevent deactivating a student who has active courses:
+            if (hasActiveEnrollments)
+            {
+                // You can either block it or just deactivate their account and handle enrollments
+                // Here we choose to inform the admin or unenroll them first
+                return BadRequest(new { message = "Cannot deactivate student with active course enrollments." });
+            }
+
+
+            // Apply soft delete by deactivating the account
+            student.IsActive = false;
+
+            _context.Users.Update(student);
+            await _context.SaveChangesAsync();
+
+            return Ok(new { message = "Student account has been deactivated successfully." });
+        }
 
 
 

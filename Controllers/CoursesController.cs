@@ -26,7 +26,8 @@ namespace SmartAcademyApi.Controllers
         public async Task<IActionResult> GetCourses()
         {
             var courses = await _context.Courses
-                .Include(c => c.Instructor) // جلب بيانات المدرس الذي أنشأ الكورس
+                .Where(c => c.IsActive)// Fetch only active courses
+                .Include(c => c.Instructor) //Retrieve data for the instructor who created the course.
                 .Select(c => new
                 {
                     c.Id,
@@ -44,7 +45,8 @@ namespace SmartAcademyApi.Controllers
         {
             var course = await _context.Courses
                 .Include(c => c.Instructor)
-                .Include(c => c.Lessons) // جلب الدروس التابعة لهذا الكورس
+                .Include(c => c.Lessons) // Retrieve the lessons associated with this course.
+                .Where(c => c.Id == id && c.IsActive) // Ensure the course exists and is active
                 .Where(c => c.Id == id)
                 .Select(c => new
                 {
@@ -70,7 +72,7 @@ namespace SmartAcademyApi.Controllers
         [EnableRateLimiting("WriteLimiter")]
         public async Task<IActionResult> CreateCourse([FromBody] CourseCreateDto model)
         {
-            // استخراج معرف المستخدم (المدرس) الحالي من الـ JWT Token
+            // Extract the current user (teacher) ID from the JWT token
             var userIdString = User.FindFirst(ClaimTypes.NameIdentifier)?.Value
                                ?? User.FindFirst(System.IdentityModel.Tokens.Jwt.JwtRegisteredClaimNames.NameId)?.Value;
 
@@ -84,7 +86,7 @@ namespace SmartAcademyApi.Controllers
                 Title = model.Title,
                 Description = model.Description,
                 Price = model.Price,
-                InstructorId = instructorId // ربط الكورس بالمدرس الذي قام بتسجيل الدخول
+                InstructorId = instructorId // Link the course to the instructor who is logged in.
             };
 
             _context.Courses.Add(course);
@@ -93,6 +95,36 @@ namespace SmartAcademyApi.Controllers
             return Ok(new { message = "The course has been successfully created", courseId = course.Id });
         }
 
+        [HttpDelete("Delete/{id}")]
+        [Authorize(Roles ="Admin")] //Ensures only admins can delete/deactivate
+        [EnableRateLimiting("WriteLimiter")]
+        public async Task<IActionResult>DeleteCoures(int id)
+        {
+            //Find the course by iD
+            var courseId = await _context.Courses.FindAsync(id);
+            if (courseId == null)
+            {
+                return NotFound(new {message = "Course not found."});
+            }
+
+            // Check if there are active student enrollments in this course
+            bool hasActiveEnrollments = await _context.Enrollments
+                .AnyAsync(e => e.CourseId == id && e.IsActive == true);
+
+            if (hasActiveEnrollments)
+            {
+                return BadRequest(new { message = "Cannot deactivate this course because there are active student enrollments." });
+            }
+
+
+            //apply soft delete by setting IsActice to false
+            courseId.IsActive = false;
+
+            _context.Courses.Update(courseId);
+            await _context.SaveChangesAsync();
+
+            return Ok(new { message = "Course has been deleted successfully." });
+        }
 
     }
 }

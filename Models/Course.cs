@@ -17,11 +17,13 @@ namespace SmartAcademyApi.Models
         [Column(TypeName = "decimal(18,2)")]
         public decimal Price { get; set; }
 
-        // المفتاح الأجنبي الذي يربط الكورس بالمدرس
+        // The foreign key linking the course to the instructor
         public int InstructorId { get; set; }
 
+        public bool IsActive { get; set; } = true; // or IsDeleted = false
+
         [ForeignKey("InstructorId")]
-        public User Instructor { get; set; } // علاقة التنقل للمدرس
+        public User Instructor { get; set; } // Teacher Mobility Relationship
 
         public ICollection<Enrollment> Enrollments { get; set; }
         public ICollection<Lesson> Lessons { get; set; }

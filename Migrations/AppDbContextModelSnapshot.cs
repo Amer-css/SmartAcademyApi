@@ -49,7 +49,7 @@ namespace SmartAcademyApi.Migrations
 
                     b.HasIndex("InstructorId");
 
-                    b.ToTable("Courses");
+                    b.ToTable("Courses", (string)null);
                 });
 
             modelBuilder.Entity("SmartAcademyApi.Models.Enrollment", b =>
@@ -78,7 +78,7 @@ namespace SmartAcademyApi.Migrations
 
                     b.HasIndex("StudentId");
 
-                    b.ToTable("Enrollments");
+                    b.ToTable("Enrollments", (string)null);
                 });
 
             modelBuilder.Entity("SmartAcademyApi.Models.Exam", b =>
@@ -101,7 +101,7 @@ namespace SmartAcademyApi.Migrations
 
                     b.HasIndex("CourseId");
 
-                    b.ToTable("Exams");
+                    b.ToTable("Exams", (string)null);
                 });
 
             modelBuilder.Entity("SmartAcademyApi.Models.Lesson", b =>
@@ -128,7 +128,7 @@ namespace SmartAcademyApi.Migrations
 
                     b.HasIndex("CourseId");
 
-                    b.ToTable("Lessons");
+                    b.ToTable("Lessons", (string)null);
                 });
 
             modelBuilder.Entity("SmartAcademyApi.Models.Question", b =>
@@ -158,7 +158,7 @@ namespace SmartAcademyApi.Migrations
 
                     b.HasIndex("ExamId");
 
-                    b.ToTable("Questions");
+                    b.ToTable("Questions", (string)null);
                 });
 
             modelBuilder.Entity("SmartAcademyApi.Models.User", b =>
@@ -198,7 +198,7 @@ namespace SmartAcademyApi.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Users");
+                    b.ToTable("Users", (string)null);
                 });
 
             modelBuilder.Entity("SmartAcademyApi.Models.Course", b =>

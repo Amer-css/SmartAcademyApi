@@ -34,37 +34,56 @@ namespace SmartAcademyApi.Controllers
             return Convert.ToBase64String(bytes);
         }
 
-
         [HttpPost("register")]
-           public async Task<IActionResult> Register(RegisterDto model)
-           {
-               if (await _context.Users.AnyAsync(u => u.Email == model.Email))
-               {
-                   return BadRequest("The email address is already in use.");
-               }
-          
-               string passwordHash = BCrypt.Net.BCrypt.HashPassword(model.Password);
-          
-               var user = new User
-               {
-                   FullName = model.FullName,
-                   Email = model.Email,
-                   PasswordHash = passwordHash,
-                   Role = "Student"
-               };
-          
-               _context.Users.Add(user);
-               await _context.SaveChangesAsync();
-          
-               return Ok(new { message = "The account has been created successfully!" });
-           }
-          
-        
-          [HttpPost("login")]
+        public async Task<IActionResult> Register(RegisterDto model)
+        {
+            // 1. Search for the user by email (even if deleted / IsActive = false)
+            // If you are not using Global Query Filters, it will find the user normally.
+            var existingUser = await _context.Users
+                .IgnoreQueryFilters() // Ensures the user is retrieved, even if disabled.
+                .FirstOrDefaultAsync(u => u.Email == model.Email);
+
+            if (existingUser != null)
+            {
+                // 2. If the user exists but their account is disabled (Soft Deleted / IsActive == false or null)
+                if (existingUser.IsActive == false || existingUser.IsActive == null)
+                {
+                    existingUser.FullName = model.FullName;
+                    existingUser.PasswordHash = BCrypt.Net.BCrypt.HashPassword(model.Password);
+                    existingUser.IsActive = true; // Reactivate the account
+                    existingUser.Role = "Student";
+
+                    await _context.SaveChangesAsync();
+                    return Ok(new { message = "The account has been reactivated successfully!" });
+                }
+
+             // 3. If the user exists and their account is already active
+                return BadRequest("The email address is already in use.");
+            }
+
+             // 4. If the user does not exist at all, create a new account.
+            string passwordHash = BCrypt.Net.BCrypt.HashPassword(model.Password);
+
+            var user = new User
+            {
+                FullName = model.FullName,
+                Email = model.Email,
+                PasswordHash = passwordHash,
+                Role = "Student",
+                IsActive = true //Set as active upon initial registration
+            };
+
+            _context.Users.Add(user);
+            await _context.SaveChangesAsync();
+
+            return Ok(new { message = "The account has been created successfully!" });
+        }
+
+        [HttpPost("login")]
          [EnableRateLimiting("AuthLimiter")]
           public async Task<IActionResult> Login([FromBody]LoginDto model)
           {
-              var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == model.Email);
+              var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == model.Email && u.IsActive == true);
 
             if (user == null)
             {
