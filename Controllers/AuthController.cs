@@ -46,7 +46,7 @@ namespace SmartAcademyApi.Controllers
             if (existingUser != null)
             {
                 // 2. If the user exists but their account is disabled (Soft Deleted / IsActive == false or null)
-                if (existingUser.IsActive == false || existingUser.IsActive == null)
+                if (!existingUser.IsActive)
                 {
                     existingUser.FullName = model.FullName;
                     existingUser.PasswordHash = BCrypt.Net.BCrypt.HashPassword(model.Password);
@@ -79,15 +79,21 @@ namespace SmartAcademyApi.Controllers
             return Ok(new { message = "The account has been created successfully!" });
         }
 
-        [HttpPost("login")]
-         [EnableRateLimiting("AuthLimiter")]
+          [HttpPost("login")]
+          [EnableRateLimiting("AuthLimiter")]
           public async Task<IActionResult> Login([FromBody]LoginDto model)
           {
-              var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == model.Email && u.IsActive == true);
+              var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == model.Email);
 
             if (user == null)
             {
+
                 return Unauthorized("Invalid credentials!");
+            }
+
+            if (user.IsActive != true)
+            {
+                return Unauthorized("This account has been deactivated.");
             }
 
             bool isVBalidPassword = BCrypt.Net.BCrypt.Verify(model.Password, user.PasswordHash);

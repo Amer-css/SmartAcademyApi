@@ -162,5 +162,6 @@ namespace SmartAcademyApi.Controllers
 
             return Ok(new { message = "Enrollment has been deactivated successfully." });
         }
+
     }
 }

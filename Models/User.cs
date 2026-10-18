@@ -29,7 +29,7 @@ namespace SmartAcademyApi.Models
 
         public ICollection<Enrollment> Enrollments { get; set; }
 
-        public bool? IsActive { get; set; } 
+        public bool IsActive { get; set; } = true;
 
 
         public string? RefreshTokenHash { get; set; }

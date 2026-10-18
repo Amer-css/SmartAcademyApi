@@ -1,71 +1,130 @@
 ﻿
+using System.Diagnostics;
 using System.Security.Claims;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using SmartAcademyApi.Data;
 using SmartAcademyApi.DTOs;
 using SmartAcademyApi.Models;
 
 namespace SmartAcademyApi.Controllers
 {
+    //Cash Keys
+    public static class CacheKeys
+    {
+        public static readonly string Courses = "courses_cache_key";
+        public static readonly string Instructors = "instructors_cache_key";
+        
+    }
+
+
     [Route("api/[controller]")]
     [ApiController]
     public class CoursesController: Controller
     {
         private readonly AppDbContext _context;
 
-        public CoursesController(AppDbContext context)
+        private readonly IMemoryCache _cache;
+
+        public CoursesController(AppDbContext context, IMemoryCache cache)
         {
             _context = context;
+            _cache = cache;
         }
-
-        [HttpGet]
+        //using cacheing
+        [HttpGet("Get All Course")]
         public async Task<IActionResult> GetCourses()
         {
-            var courses = await _context.Courses
-                .Where(c => c.IsActive)// Fetch only active courses
-                .Include(c => c.Instructor) //Retrieve data for the instructor who created the course.
-                .Select(c => new
-                {
-                    c.Id,
-                    c.Title,
-                    c.Description,
-                    c.Price,
-                    InstructorName = c.Instructor.FullName
-                })
-                .ToListAsync();
+
+
+
+            // Attempt to retrieve from cache; if not found or expired, execute the factory delegate to fetch from DB and cache the result
+            var courses = await _cache.GetOrCreateAsync(CacheKeys.Courses, async entry =>
+            {
+                // Set the absolute expiration time for this cache entry (e.g., 5 minutes)
+                entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(5);
+               
+                // Fetch courses from the database along with their instructor details
+                var fetchedCourses = await _context.Courses
+                    .AsNoTracking()
+                    .Select(c => new
+                    {
+                        c.Id,
+                        c.Title,
+                        c.Description,
+                        c.Price,
+                        InstructorName = c.Instructor.FullName
+                    })
+                    .ToListAsync();
+
+              
+                // Return the fresh data so GetOrCreateAsync automatically stores it in the RAM cache
+                return fetchedCourses;
+            });
+
+   
             return Ok(courses);
         }
 
-        [HttpGet("{id}")]
-        public async Task<IActionResult> GetCourseByID(int id)
-        {
-            var course = await _context.Courses
-                .Include(c => c.Instructor)
-                .Include(c => c.Lessons) // Retrieve the lessons associated with this course.
-                .Where(c => c.Id == id && c.IsActive) // Ensure the course exists and is active
-                .Where(c => c.Id == id)
-                .Select(c => new
-                {
-                    c.Id,
-                    c.Title,
-                    c.Description,
-                    c.Price,
-                    InstructorName = c.Instructor.FullName,
-                    Lessons = c.Lessons.Select(l => new { l.Id, l.Title, l.VideoUrl })
-                })
-                .FirstOrDefaultAsync();
+        //------------
 
-            if (course == null)
-            {
-                return NotFound("The course does not exist.");
-            }
 
-            return Ok(course);
-        }
+
+        ////with out cacheing
+        //[HttpGet("Get All Course")]
+        //public async Task<IActionResult> GetCourses()
+        //{
+        //    var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+
+        //    // Fetching data directly from the database on every request.
+        //    var courses = await _context.Courses
+        //        .Include(c => c.Instructor) //Retrieve data for the instructor who created the course.
+        //        .Select(c => new
+        //        {
+        //            c.Id,
+        //            c.Title,
+        //            c.Description,
+        //            c.Price,
+        //            InstructorName = c.Instructor.FullName
+        //        })
+        //        .ToListAsync();
+
+        //    stopwatch.Stop();
+        //    Console.WriteLine($"[Without Cache] Execution Time: {stopwatch.ElapsedMilliseconds} ms");
+
+        //    return Ok(courses);
+        //}
+
+        //[HttpGet("{id}")]
+        //public async Task<IActionResult> GetCourseByID(int id)
+        //{
+        //    var course = await _context.Courses
+        //        .Include(c => c.Instructor)
+        //        .Include(c => c.Lessons) // Retrieve the lessons associated with this course.
+        //        .Where(c => c.Id == id ) 
+        //        .Where(c => c.Id == id)
+        //        .Select(c => new
+        //        {
+        //            c.Id,
+        //            c.Title,
+        //            c.Description,
+        //            c.Price,
+        //            InstructorName = c.Instructor.FullName,
+        //            Lessons = c.Lessons.Select(l => new { l.Id, l.Title, l.VideoUrl })
+        //        })
+        //        .FirstOrDefaultAsync();
+
+        //    if (course == null)
+        //    {
+        //        return NotFound("The course does not exist.");
+        //    }
+
+        //    return Ok(course);
+        //}
 
         [HttpPost]
         [Authorize(Roles = "Instructor,Admin")]
@@ -92,10 +151,13 @@ namespace SmartAcademyApi.Controllers
             _context.Courses.Add(course);
             await _context.SaveChangesAsync();
 
+            // Remove the old version from the cache.
+            _cache.Remove(CacheKeys.Courses);
+
             return Ok(new { message = "The course has been successfully created", courseId = course.Id });
         }
 
-        [HttpDelete("Delete/{id}")]
+        [HttpDelete("Delete course/{id}")]
         [Authorize(Roles ="Admin")] //Ensures only admins can delete/deactivate
         [EnableRateLimiting("WriteLimiter")]
         public async Task<IActionResult>DeleteCoures(int id)
@@ -123,8 +185,40 @@ namespace SmartAcademyApi.Controllers
             _context.Courses.Update(courseId);
             await _context.SaveChangesAsync();
 
+            // Remove the old version from the cache.
+            _cache.Remove(CacheKeys.Courses);
             return Ok(new { message = "Course has been deleted successfully." });
         }
+
+    
+        [HttpPost("restore course/{id}")]
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> RestoreCourse(int id)
+        {
+            var course = await _context.Courses
+                .IgnoreQueryFilters()
+                .FirstOrDefaultAsync(c => c.Id == id);
+
+            if (course == null)
+            {
+                return NotFound("Course not found.");
+            }
+
+            if (course.IsActive == true)
+            {
+                return BadRequest("Course is already active.");
+            }
+
+            course.IsActive = true;
+            await _context.SaveChangesAsync();
+
+
+            // Remove the old version from the cache.
+            _cache.Remove(CacheKeys.Courses);
+
+            return Ok(new { message = "Course has been successfully restored/reactivated." });
+        }
+
 
     }
 }

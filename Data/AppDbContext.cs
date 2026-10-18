@@ -23,12 +23,18 @@ namespace SmartAcademyApi.Data
         {
             base.OnModelCreating(modelBuilder);
 
-            // تعطيل الحذف المتسلسل لـ StudentId في جدول Enrollments لتجنب خطأ 1785
-            modelBuilder.Entity<Enrollment>()
+            // Disable cascading delete for StudentId in the Enrollments table to avoid error 1785
+                 modelBuilder.Entity<Enrollment>()
                 .HasOne(e => e.Student)
                 .WithMany(u => u.Enrollments)
                 .HasForeignKey(e => e.StudentId)
-                .OnDelete(DeleteBehavior.Restrict); // منع الحذف التلقائي المتداخل
+                .OnDelete(DeleteBehavior.Restrict); //Prevent nested automatic deletion
+
+            // 2. Applying the soft delete filter (Global Query Filters) to the base tables
+
+          //  modelBuilder.Entity<User>().HasQueryFilter(u => u.IsActive == true);
+            modelBuilder.Entity<Course>().HasQueryFilter(c => c.IsActive == true);
+            modelBuilder.Entity<Enrollment>().HasQueryFilter(e => e.IsActive == true);
         }
     }
 }

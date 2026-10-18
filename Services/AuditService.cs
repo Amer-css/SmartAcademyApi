@@ -26,7 +26,7 @@ namespace SmartAcademyApi.Services
                     Method = method,
                     IpAddress = ipAddress,
                     StatusCode = statusCode,
-                    Timestamp = DateTime.UtcNow,
+                    Timestamp = DateTime.Now,
                     Details = details
                 };
 

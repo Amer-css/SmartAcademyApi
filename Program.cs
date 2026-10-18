@@ -12,6 +12,7 @@ using SmartAcademyApi.Authorization;
 using SmartAcademyApi.AuditMiddlewar;
 using Swashbuckle.AspNetCore.SwaggerGen;
 using SmartAcademy.API.Filters;
+using SmartAcademyApi.Permissions;
 
 
 var builder = WebApplication.CreateBuilder(args);
@@ -167,6 +168,11 @@ builder.Services.AddSwaggerGen(options =>
 
 
 builder.Services.AddScoped<IAuditService, AuditService>();
+
+//Storing some data in the cache
+builder.Services.AddMemoryCache();
+
+builder.Services.AddScoped<IPermissionService, PermissionService>();
 
 
 var app = builder.Build();
