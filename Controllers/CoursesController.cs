@@ -10,6 +10,8 @@ using Microsoft.Extensions.Caching.Memory;
 using SmartAcademyApi.Data;
 using SmartAcademyApi.DTOs;
 using SmartAcademyApi.Models;
+using SmartAcademyApi.Permissions;
+
 
 namespace SmartAcademyApi.Controllers
 {
@@ -36,7 +38,7 @@ namespace SmartAcademyApi.Controllers
             _cache = cache;
         }
         //using cacheing
-        [HttpGet("Get All Course")]
+        [HttpGet("Get All Course")]      
         public async Task<IActionResult> GetCourses()
         {
 
@@ -127,7 +129,7 @@ namespace SmartAcademyApi.Controllers
         //}
 
         [HttpPost]
-        [Authorize(Roles = "Instructor,Admin")]
+        [HasPermission(SmartAcademyApi.Permissions.Permissions.Courses.Create)]
         [EnableRateLimiting("WriteLimiter")]
         public async Task<IActionResult> CreateCourse([FromBody] CourseCreateDto model)
         {
@@ -158,7 +160,7 @@ namespace SmartAcademyApi.Controllers
         }
 
         [HttpDelete("Delete course/{id}")]
-        [Authorize(Roles ="Admin")] //Ensures only admins can delete/deactivate
+        [HasPermission(SmartAcademyApi.Permissions.Permissions.Courses.Delete)]
         [EnableRateLimiting("WriteLimiter")]
         public async Task<IActionResult>DeleteCoures(int id)
         {
@@ -192,7 +194,7 @@ namespace SmartAcademyApi.Controllers
 
     
         [HttpPost("restore course/{id}")]
-        [Authorize(Roles = "Admin")]
+        [HasPermission(SmartAcademyApi.Permissions.Permissions.Courses.Edit)]
         public async Task<IActionResult> RestoreCourse(int id)
         {
             var course = await _context.Courses

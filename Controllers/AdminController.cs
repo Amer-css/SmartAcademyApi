@@ -38,15 +38,24 @@ namespace SmartAcademyApi.Controllers
                 return BadRequest("The entered role is invalid. The allowed roles are: Student, Instructor, Admin.");
             }
 
-            var user = await _context.Users.FindAsync(id);
+             var user = await _context.Users
+            .Include(u => u.Role)
+            .FirstOrDefaultAsync(u => u.Id == id);
             if (user == null)
             {
                 return NotFound("User not found.");
             }
 
-            var OldRole =user.Role;
+            var newRoleEntity = await _context.Roles
+            .FirstOrDefaultAsync(r => r.Name == model.NewRole);
+            if (newRoleEntity == null)
+            {
+                return BadRequest("The specified role does not exist in the database.");
+            }
+
+            var OldRole =user.Role.Name ??"None";
             // C. Updating the role and saving changes
-            user.Role = model.NewRole;
+            user.RoleId = newRoleEntity.Id;
             await _context.SaveChangesAsync();
 
             return Ok(new { message = $"The user role has been updated from {OldRole} To '{user.Role} successfully." });
@@ -84,6 +93,7 @@ namespace SmartAcademyApi.Controllers
         /// <response code="404">User not found.</response>
         [HttpDelete("Delete user/{id}")]
         [Authorize(Roles = "Admin")]
+        [EnableRateLimiting("WriteLimiter")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status401Unauthorized)]
@@ -142,6 +152,48 @@ namespace SmartAcademyApi.Controllers
             await _context.SaveChangesAsync();
 
             return Ok(new { message = "User account has been successfully restored/reactivated." });
+        }
+
+
+        [HttpGet("{id}", Name = "GetStudentById")]
+        public async Task<ActionResult> GetStudentById(int id, [FromServices] IAuthorizationService authorizationService)
+        {
+            if (id < 1)
+                return BadRequest("Invalid student id.");
+
+            var student = await _context.Users
+               .Include(u => u.Role) // 1. Include the Role table to verify it
+               .Where(u => u.Id == id && u.Role.Name == "Student") // 2. Check the role name through the relational navigation property
+               .Include(u => u.Enrollments)
+               .ThenInclude(e => e.Course)
+               .Select(u => new
+               {
+                   u.Id,
+                   u.FullName,
+                   u.Email,
+                   EnrolledCourses = u.Enrollments.Select(e => new
+                   {
+                       e.Course.Id,
+                       e.Course.Title,
+                       e.Course.Price,
+                       e.EnrolledAt
+                   })
+               })
+               .FirstOrDefaultAsync();
+
+            if (student == null)
+                return NotFound("Student not found.");
+
+            // Dynamically evaluate the policy while passing the ID (resource)
+            var authResult = await authorizationService.AuthorizeAsync(
+                User,
+                id,
+                "StudentOwnerOrAdmin");
+
+            if (!authResult.Succeeded)
+                return NotFound("Student not found."); // Returns 403 Forbidden if not the owner or an admin.
+
+            return Ok(student);
         }
 
 

@@ -21,7 +21,8 @@ namespace SmartAcademyApi.Models
         public string PasswordHash { get; set; }
 
         [Required]
-        public string Role { get; set; } // Admin, Instructor, Student
+        public int RoleId { get; set; }
+        public Role Role { get; set; } = null!;
 
 
         // One-to-Many relationship: A single teacher can have multiple courses.

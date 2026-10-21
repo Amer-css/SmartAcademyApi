@@ -35,33 +35,42 @@ namespace SmartAcademyApi.Controllers
         }
 
         [HttpPost("register")]
+        [EnableRateLimiting("WriteLimiter")] 
         public async Task<IActionResult> Register(RegisterDto model)
         {
-            // 1. Search for the user by email (even if deleted / IsActive = false)
-            // If you are not using Global Query Filters, it will find the user normally.
+            // 1. Search for the default role for a new user (Student) to retrieve its ID
+            var studentRole = await _context.Roles
+                .FirstOrDefaultAsync(r => r.Name == "Student");
+
+            if (studentRole == null)
+            {
+                return BadRequest("The default 'Student' role is not configured in the database.");
+            }
+
+            // 2. Search for the user by email (even if they have been soft-deleted)
             var existingUser = await _context.Users
-                .IgnoreQueryFilters() // Ensures the user is retrieved, even if disabled.
+                .IgnoreQueryFilters()
                 .FirstOrDefaultAsync(u => u.Email == model.Email);
 
             if (existingUser != null)
             {
-                // 2. If the user exists but their account is disabled (Soft Deleted / IsActive == false or null)
+                // 3. If the user exists but is disabled (IsActive == false)
                 if (!existingUser.IsActive)
                 {
                     existingUser.FullName = model.FullName;
                     existingUser.PasswordHash = BCrypt.Net.BCrypt.HashPassword(model.Password);
-                    existingUser.IsActive = true; // Reactivate the account
-                    existingUser.Role = "Student";
+                    existingUser.IsActive = true; // Reactivating the account
+                    existingUser.RoleId = studentRole.Id; // Assign the RoleId instead of the text
 
                     await _context.SaveChangesAsync();
                     return Ok(new { message = "The account has been reactivated successfully!" });
                 }
 
-             // 3. If the user exists and their account is already active
+                // 4. If the account already exists and is active
                 return BadRequest("The email address is already in use.");
             }
 
-             // 4. If the user does not exist at all, create a new account.
+            // 5. If it is a completely new user, we create the account
             string passwordHash = BCrypt.Net.BCrypt.HashPassword(model.Password);
 
             var user = new User
@@ -69,8 +78,8 @@ namespace SmartAcademyApi.Controllers
                 FullName = model.FullName,
                 Email = model.Email,
                 PasswordHash = passwordHash,
-                Role = "Student",
-                IsActive = true //Set as active upon initial registration
+                RoleId = studentRole.Id, // Linking the user to the student role via ID               
+                IsActive = true// Activating the account upon first-time registration
             };
 
             _context.Users.Add(user);
@@ -83,7 +92,9 @@ namespace SmartAcademyApi.Controllers
           [EnableRateLimiting("AuthLimiter")]
           public async Task<IActionResult> Login([FromBody]LoginDto model)
           {
-              var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == model.Email);
+              var user = await _context.Users
+                .Include(u => u.Role)
+                .FirstOrDefaultAsync(u => u.Email == model.Email);
 
             if (user == null)
             {
@@ -104,7 +115,7 @@ namespace SmartAcademyApi.Controllers
             }
 
 
-            var accessToken = _tokenService.CreateToken(user);
+            var accessToken = await _tokenService.CreateToken(user);
 
             // Create refresh token (random)
             var refreshToken = GenerateRefreshToken();
@@ -129,7 +140,9 @@ namespace SmartAcademyApi.Controllers
         {
             // 1. Find the user associated with the refresh token 
 
-            var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == request.Email);
+            var user = await _context.Users
+                .Include(u => u.Role)
+                .FirstOrDefaultAsync(u => u.Email == request.Email);
 
             if (user == null)
             {
@@ -156,7 +169,7 @@ namespace SmartAcademyApi.Controllers
             }
 
             // 5. Issue a new Access Token (using our existing)
-            var newAccessToken = _tokenService.CreateToken(user);
+            var newAccessToken =await _tokenService.CreateToken(user);
 
             // 6. Rotation Policy: Generating a completely new refresh token and invalidating/updating the old one.
             var newRefreshToken = GenerateRefreshToken();

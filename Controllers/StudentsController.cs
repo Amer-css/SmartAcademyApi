@@ -9,7 +9,8 @@ using System.Security.Claims;
 using SmartAcademyApi.Models;
 using SmartAcademyApi.DTOs;
 using Microsoft.AspNetCore.RateLimiting;
-
+using SmartAcademyApi.Permissions;
+using static SmartAcademyApi.Permissions.Permissions;
 
 namespace SmartAcademyApi.Controllers
 {
@@ -35,7 +36,8 @@ namespace SmartAcademyApi.Controllers
             int studentId = int.Parse(userIdString);
 
             var student = await _context.Users
-                .Where(u => u.Id == studentId && u.Role == "Student")
+                .Include(u => u.Role)
+                .Where(u => u.Id == studentId && u.Role.Name == "Student")
                 .Include(u => u.Enrollments)
                 .ThenInclude(e => e.Course)
                 .Select(u => new
@@ -58,31 +60,10 @@ namespace SmartAcademyApi.Controllers
             return Ok(student);
         }
 
-        // 2. Function to fetch my courses (which we created earlier)
-        [HttpGet("my-courses")]
-        public async Task<IActionResult> GetMyCourses()
-        {
-            var userIdString = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (string.IsNullOrEmpty(userIdString)) return Unauthorized();
-            int studentId = int.Parse(userIdString);
-
-            var studentCourses = await _context.Enrollments
-                .Where(e => e.StudentId == studentId)
-                .Select(e => new
-                {
-                    e.Course.Id,
-                    e.Course.Title,
-                    e.Course.Description,
-                    e.Course.Price
-                })
-                .ToListAsync();
-
-            return Ok(studentCourses);
-        }
-
+       
         // 3. Function to Update Profile Student(Name - full Name)
         [HttpPut("Updateprofile")]
-        [EnableRateLimiting("WriteLimiter")]
+        [EnableRateLimiting("WriteLimiter")]      
         public async Task<IActionResult> UpdateProfile([FromBody] UpdateProfileDto updateDto)
         {
             // 1. Securely extract the student ID exclusively from the token.
@@ -93,16 +74,16 @@ namespace SmartAcademyApi.Controllers
             }
 
             int studentId = int.Parse(userIdString);
-           
-            // 2. Search for the user in the database and verify that they are a student.
+
+            // 2. Search for the user in the database including the Role table and verify that they are a student.
             var student = await _context.Users
-                .FirstOrDefaultAsync(u => u.Id == studentId && u.Role == "Student");
+                .Include(u => u.Role) // Include the Role table to verify it
+                .FirstOrDefaultAsync(u => u.Id == studentId && u.Role.Name == "Student"); // Check role name via relationship
 
             if (student == null)
             {
                 return NotFound("Student not found.");
             }
-
 
             // 3. Update only the allowed fields
             student.FullName = updateDto.FullName;
@@ -116,7 +97,6 @@ namespace SmartAcademyApi.Controllers
                 message = "Profile updated successfully.",
                 updatedName = student.FullName
             });
-
         }
 
         //4.Function to Update Student Password 
@@ -124,6 +104,7 @@ namespace SmartAcademyApi.Controllers
         [EnableRateLimiting("WriteLimiter")]
         public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordDto model)
         {
+            // 1. Get the current user ID from the JWT claims
             var userIdString = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (string.IsNullOrEmpty(userIdString))
             {
@@ -132,9 +113,10 @@ namespace SmartAcademyApi.Controllers
 
             int studentId = int.Parse(userIdString);
 
-            // 2. Search for the user in the database
+            // 2. Search for the user in the database including the Role relation
             var student = await _context.Users
-                .FirstOrDefaultAsync(u => u.Id == studentId && u.Role == "Student");
+                .Include(u => u.Role) // Include the Role table to verify it
+                .FirstOrDefaultAsync(u => u.Id == studentId && u.Role.Name == "Student"); // Check role name via relationship
 
             if (student == null)
             {
@@ -155,51 +137,9 @@ namespace SmartAcademyApi.Controllers
             await _context.SaveChangesAsync();
 
             return Ok(new { message = "Password changed successfully." });
-
         }
 
-        [HttpGet("{id}", Name = "GetStudentById")]
-        public async Task<ActionResult> GetStudentById(int id, [FromServices] IAuthorizationService authorizationService)
 
-        {
-            if (id < 1)
-                return BadRequest("Invalid student id.");
-
-            var student = await _context.Users
-               .Where(u => u.Id == id && u.Role == "Student")
-               .Include(u => u.Enrollments)
-               .ThenInclude(e => e.Course)
-               .Select(u => new
-               {
-                   u.Id,
-                   u.FullName,
-                   u.Email,
-                   EnrolledCourses = u.Enrollments.Select(e => new
-                   {
-                       e.Course.Id,
-                       e.Course.Title,
-                       e.Course.Price,
-                       e.EnrolledAt
-                   })
-               })
-               .FirstOrDefaultAsync();
-
-            if (student == null)
-                return NotFound("Student not found.");
-
-            // Dynamically evaluate the policy while passing the ID (resource)
-            var authResult = await authorizationService.AuthorizeAsync(
-                User,
-                id,
-                "StudentOwnerOrAdmin");
-
-            if (!authResult.Succeeded)
-                return NotFound("Student not found."); // Returns 403 Forbidden if not the owner or an admin.
-
-            return Ok(student);
-        }
-
-       
 
     }
 }

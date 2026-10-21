@@ -5,7 +5,7 @@
 namespace SmartAcademyApi.Migrations
 {
     /// <inheritdoc />
-    public partial class AddAuditLogTable : Migration
+    public partial class AddRolesAndPermissionsClean : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)

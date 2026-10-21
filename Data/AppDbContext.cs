@@ -9,13 +9,17 @@ namespace SmartAcademyApi.Data
         {
         }
 
-        // تسجيل الجداول (Entities) لكي يتعرف عليها EF Core وينشئها في SQL Server
+        //Registering entities so that EF Core can recognize them and create them in SQL Server
         public DbSet<User> Users { get; set; }
         public DbSet<Course> Courses { get; set; }
         public DbSet<Enrollment> Enrollments { get; set; }
         public DbSet<Lesson> Lessons { get; set; }
         public DbSet<Exam> Exams { get; set; }
         public DbSet<Question> Questions { get; set; }
+
+        public DbSet<Role> Roles { get; set; }
+        public DbSet<Permission> Permissions { get; set; }
+        public DbSet<RolePermission> RolePermissions { get; set; }
 
         public DbSet<AuditLog> AuditLogs { get; set; }
 
@@ -35,6 +39,31 @@ namespace SmartAcademyApi.Data
           //  modelBuilder.Entity<User>().HasQueryFilter(u => u.IsActive == true);
             modelBuilder.Entity<Course>().HasQueryFilter(c => c.IsActive == true);
             modelBuilder.Entity<Enrollment>().HasQueryFilter(e => e.IsActive == true);
+
+            // ==========================================
+            // 3.Permissions System Settings
+            // ==========================================
+
+            // Defining the key for the mapping table between roles and permissions
+            modelBuilder.Entity<RolePermission>()
+                .HasKey(rp => new { rp.RoleId, rp.PermissionId });
+
+            modelBuilder.Entity<RolePermission>()
+                .HasOne(rp => rp.Role)
+                .WithMany(r => r.RolePermissions)
+                .HasForeignKey(rp => rp.RoleId);
+
+            modelBuilder.Entity<RolePermission>()
+                .HasOne(rp => rp.Permission)
+                .WithMany(p => p.RolePermissions)
+                .HasForeignKey(rp => rp.PermissionId);
+
+            // (User to Role)
+            modelBuilder.Entity<User>()
+                .HasOne(u => u.Role)
+                .WithMany(r => r.Users)
+                .HasForeignKey(u => u.RoleId); 
+
         }
     }
 }
